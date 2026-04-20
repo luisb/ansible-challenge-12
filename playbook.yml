@@ -30,30 +30,45 @@
         immediate: true
     
     - name: Deploy homepage template
-      ansible.builtin.template:
-        src: index.html.j2
-        dest: /var/www/html/index.html
-        mode: '0644'
-        backup: true
-      register: backup
-      notify: restart httpd
-
-    - name: Flush handlers before health check
-      ansible.builtin.meta: flush_handlers
-
-    - name: Health check
       block:
-        - name: Try health check
-          ansible.builtin.uri:
-            url: http://localhost
-            status_code: 200
-      rescue:
-        - name: Health check failed. Reverting template.
+        - name: Deploy homepage template with backup
           ansible.builtin.template:
-            src: reverted-index.html.j2
+            src: index.html.j2
             dest: /var/www/html/index.html
             mode: '0644'
+            backup: true
+          register: backup
           notify: restart httpd
+
+        - name: Flush handlers before health check
+          ansible.builtin.meta: flush_handlers
+
+        - name: Health check
+            ansible.builtin.uri:
+              url: http://localhost
+              status_code: 200
+            register: health
+
+      rescue:
+        - name: Revert to previous homepage from backup
+          ansible.builtin.copy:
+            src: "{{ backup.backup_file }}"
+            dest: /var/www/html/index.html
+            mode: '0644'
+          when: backup.backup_file is defined
+          notify: restart httpd
+
+        - name: Flush handlers after rollback
+          ansible.builtin.meta: flush_handlers
+
+        - name: Fail deployement after rollback
+          ansible.builtin.fail:
+            msg: "Deployment failed on {{ inventory_hostname }} and rollback was performed."
+      
+      always:
+        - name: Show deployment status
+          ansible.builtin.debug:
+            msg: "Deployment attempt finished on {{ inventory_hostname }}"
 
 
   handlers:
