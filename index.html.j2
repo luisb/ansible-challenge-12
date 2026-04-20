@@ -1,0 +1,10 @@
+<html>
+<body>
+<ul>
+    <li>Hostname: {{ inventory_hostname }}</li>
+    <li>Primary IP: {{ ansible_facts['default_ipv4']['address'] }}</li>
+    <li>Environment: {{ app_env }}</li>
+    <li>Deployment timestamp: {{ ansible_facts['date_time']['date'] }}</li>
+</ul>
+</body>
+</html>
