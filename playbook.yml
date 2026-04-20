@@ -16,6 +16,8 @@
         src: index.html.j2
         dest: /var/www/html/index.html
         mode: '0644'
+        backup: true
+      register: backup
       notify: restart httpd
 
     - name: Ensure httpd is started
@@ -41,6 +43,9 @@
         state: enabled
         permanent: true
         immediate: true
+
+    - name: Flush handlers before health check
+      ansible.builtin.meta: flush_handlers
 
     - name: Health check
       block:
