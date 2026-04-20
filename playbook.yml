@@ -29,7 +29,7 @@
         permanent: true
         immediate: true
     
-    - name: Deploy homepage template
+    - name: Deploy, verify, and rollback if needed
       block:
         - name: Deploy homepage template with backup
           ansible.builtin.template:
@@ -44,10 +44,10 @@
           ansible.builtin.meta: flush_handlers
 
         - name: Health check
-            ansible.builtin.uri:
-              url: http://localhost
-              status_code: 200
-            register: health
+          ansible.builtin.uri:
+            url: http://localhost
+            status_code: 200
+          register: health
 
       rescue:
         - name: Revert to previous homepage from backup
@@ -55,6 +55,7 @@
             src: "{{ backup.backup_file }}"
             dest: /var/www/html/index.html
             mode: '0644'
+            remote_src: true
           when: backup.backup_file is defined
           notify: restart httpd
 
