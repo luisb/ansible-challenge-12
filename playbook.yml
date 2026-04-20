@@ -1,0 +1,64 @@
+---
+- name: Deploy web app to webservers with rolling updates, health checks, and automatic rollback
+  hosts: webservers
+  serial: 1
+  become: true
+  vars_files:
+    - webservers.yml
+  tasks:
+    - name: Ensure httpd is installed
+      ansible.builtin.dnf:
+        name: httpd
+        state: present
+        
+    - name: Deploy homepage template
+      ansible.builtin.template:
+        src: index.html.j2
+        dest: /var/www/html/index.html
+        mode: '0644'
+      notify: restart httpd
+
+    - name: Ensure httpd is started
+      ansible.builtin.service:
+        name: httpd
+        state: started
+        enabled: true
+
+    - name: Ensure firewalld is installed
+      ansible.builtin.dnf:
+        name: firewalld
+        state: present
+
+    - name: Ensure firewalld is started
+      ansible.builtin.service:
+        name: firewalld
+        state: started
+        enabled: true
+
+    - name: Allow http service through firewall
+      ansible.posix.firewalld:
+        service: http
+        state: enabled
+        permanent: true
+        immediate: true
+
+    - name: Health check
+      block:
+        - name: Try health check
+          ansible.builtin.uri:
+            url: http://localhost
+            status_code: 200
+      rescue:
+        - name: Health check failed. Reverting template.
+          ansible.builtin.template:
+            src: reverted-index.html.j2
+            dest: /var/www/html/index.html
+            mode: '0644'
+          notify: restart httpd
+
+
+  handlers:
+    - name: restart httpd
+      ansible.builtin.service:
+        name: httpd
+        state: restarted
